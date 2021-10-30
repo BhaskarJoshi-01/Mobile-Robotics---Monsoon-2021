@@ -1,0 +1,17 @@
+version: "3.5"
+
+services:
+    g2o:
+        build: .
+        image: g2o
+        container_name: g2o
+        volumes:
+            - "./shr:/shr:rw"
+            - "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+        environment:
+            - DISPLAY
+            - QT_X11_NO_MITSHM=1
+
+volumes:
+    shr:
+    x:
