@@ -1,9 +1,10 @@
 from matplotlib import pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 import jax.numpy as jnp
 
 
-def draw_one(X, Y, THETA, show=True):
+def draw_one(X, Y, THETA):
     ax = plt.subplot(111)
     ax.plot(X, Y, 'ro')
     plt.plot(X, Y, 'c-')
@@ -13,8 +14,46 @@ def draw_one(X, Y, THETA, show=True):
         y2 = 0.25*np.sin(THETA[i]) + Y[i]
         plt.plot([X[i], x2], [Y[i], y2], 'g->')
 
-    if show:
-        plt.show()
+    plt.show()
+
+
+def draw_three(poses_arr, gt_file='../data/gt.txt'):
+    init_x, init_y, init_th = poses_arr[0].T
+    cur_x, cur_y, cur_th = poses_arr[-1].T
+
+    # ground truth
+    gt_nodes, gt_edges = read_data(gt_file)
+
+    ax = plt.subplot(111)
+    ax.plot(gt_nodes[0], gt_nodes[1], 'ro')
+    plt.plot(gt_nodes[0], gt_nodes[1], 'c-')
+
+    for x, y, th in gt_nodes.T:
+        x2 = 0.25*np.cos(th) + x
+        y2 = 0.25*np.sin(th) + y
+        plt.plot([x, x2], [y, y2], 'b->')
+
+    # init estimate
+    for x, y, th in zip(init_x, init_y, init_th):
+        x2 = 0.25*np.cos(th) + x
+        y2 = 0.25*np.sin(th) + y
+        plt.plot([x, x2], [y, y2], 'r->')
+
+    # cur_estimate
+    ax.plot(cur_x, cur_y, 'ro')
+    ax.plot(cur_x, cur_y, 'c-')
+    for x, y, th in zip(cur_x, cur_y, cur_th):
+        x2 = 0.25*np.cos(th) + x
+        y2 = 0.25*np.sin(th) + y
+        plt.plot([x, x2], [y, y2], 'g->')
+
+    plt.legend(handles=[
+        mpatches.Patch(label='Ground Truth', color='blue'),
+        mpatches.Patch(label='Initial Estimate', color='red'),
+        mpatches.Patch(label='Optimised Trajectory', color='green')
+    ])
+
+    plt.show()
 
 
 def read_data(filename):
