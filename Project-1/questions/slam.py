@@ -158,7 +158,7 @@ class LM:
         f = self.get_residual(poses)
         return (f.T @ self.omega @ f)/2
 
-    def optimize(self):
+    def optimize(self, verbose=True):
         max_itrs = self.max_itrs
         tol = self.tol
         poses = self.init_poses
@@ -168,9 +168,10 @@ class LM:
         itr = 0
 
         while itr < max_itrs:
-            print(f"Iteration {itr}: Error: {error}")
-            if itr % 5 == 0:
-                draw_three(poses_arr)
+            if verbose:
+                print(f"Iteration {itr}: Error: {error}")
+                if itr % 10 == 0:
+                    draw_three(poses_arr)
             poses = self.update_poses(poses)
             error = self.get_error(poses)
 
@@ -185,8 +186,9 @@ class LM:
             if jnp.linalg.norm(poses_arr[-1] - poses_arr[-2]) < tol:
                 break
 
-        print(f"Final Error: {error} at itr: {itr}")
-        draw_three(poses_arr)
+        if verbose:
+            print(f"Final Error: {error} at itr: {itr}")
+            draw_three(poses_arr)
         return poses_arr, error_arr
 
     def update_poses(self, poses):
