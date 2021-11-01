@@ -81,6 +81,40 @@ jax_jacob_helper = jax.jacfwd(get_residual)
 def get_jax_jacob(poses, edges, fixed):
     return jax_jacob_helper(poses, edges, fixed).reshape(-1, poses.shape[0]*X_SIZE)
 
+# def jacobian(current_poses, edges):
+#     num_constraints = (edges[0].shape[0] * NUM_VARS) + NUM_VARS # for anchor edges
+#     num_variables = current_poses.shape[0] * NUM_VARS
+
+#     # constraints are ordered as in `edges`
+#     # variables are ordered as in `current_poses`
+
+#     J = jnp.zeros((num_constraints, num_variables))
+
+#     # for anchor edges
+#     J = jax.ops.index_update(J, jax.ops.index[:NUM_VARS, :NUM_VARS], jnp.eye(NUM_VARS))
+
+#     # for other edges
+#     for i in range(edges[0].shape[0]):
+#         ind1 = edges[0][i]
+#         ind2 = edges[1][i]
+#         del_x = edges[2][i]
+#         del_y = edges[3][i]
+#         del_theta = edges[4][i]
+
+#         J = jax.ops.index_update(
+#                 J,
+#                 jax.ops.index[NUM_VARS + i * NUM_VARS:NUM_VARS + i * NUM_VARS + NUM_VARS, ind1 * NUM_VARS: ind1 * NUM_VARS + NUM_VARS],
+#                 derivative_with_initial(*poses[ind1], *poses[ind2], del_x, del_y, del_theta)
+#             )
+
+#         J = jax.ops.index_update(
+#                 J,
+#                 jax.ops.index[NUM_VARS + i * NUM_VARS:NUM_VARS + i * NUM_VARS + NUM_VARS, ind2 * NUM_VARS: ind2 * NUM_VARS + NUM_VARS],
+#                 derivative_with_final(*poses[ind1], *poses[ind2], del_x, del_y, del_theta)
+#             )
+
+#     return J
+
 
 class LM:
     def __init__(self, init_poses, edges, fixed, lmda, max_itrs, tol, weight_ratios):
@@ -88,8 +122,8 @@ class LM:
         self.max_itrs = max_itrs
         self.tol = tol
         self.init_poses = init_poses
-        self.edges = edges
-        self.fixed = fixed
+        self.edges = edges + 0.
+        self.fixed = fixed + 0.
         edge_cnt = edges.shape[0]
         poses_cnt = init_poses.shape[0]
 
@@ -97,7 +131,7 @@ class LM:
         self.vars_cnt = poses_cnt * X_SIZE
 
         # info mat
-        odo_wt = 5
+        odo_wt = 10
         loop_wt = odo_wt * weight_ratios[0]
         fixed_wt = odo_wt * weight_ratios[1]
         print(f"Using Weights: ({odo_wt}, {loop_wt}, {fixed_wt})\n")
@@ -118,7 +152,7 @@ class LM:
         return get_residual(poses, self.edges, self.fixed)
 
     def get_jacobian(self, poses):
-        return get_jax_jacob(poses, self.edges, self.fixed)
+        return get_my_jacob(self.init_poses, self.edges, self.fixed)
 
     def get_error(self, poses):
         f = self.get_residual(poses)
@@ -159,10 +193,20 @@ class LM:
         f = self.get_residual(poses)
         j = self.get_jacobian(poses)
         H = j.T @ self.omega @ j
-
-        delta = -jnp.linalg.pinv(H + self.lmda * (j.T @ j)) @ (
-            j.T @ self.omega.T @ f)
+        delta = -jnp.linalg.inv(H + self.lmda * jnp.eye(j.shape[1])) @ \
+            j.T @ self.omega.T @ f
 
         new_poses = poses + delta.reshape(poses.shape)
-
+        # from hashlib import md5 as m
+        # x = (H + self.lmda * jnp.eye(j.shape[1]))
+        # print(self.lmda)
+        # print(m(f.tobytes()).hexdigest())
+        # print(m(j.tobytes()).hexdigest())
+        # plt.style.use('seaborn')
+        # plt.imshow(j)
+        # plt.show()
+        # print(m(self.omega.tobytes()).hexdigest())
+        # print(m(x.tobytes()).hexdigest())
+        # print(m(delta.tobytes()).hexdigest())
+        # 1/0
         return new_poses
