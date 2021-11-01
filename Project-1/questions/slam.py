@@ -117,7 +117,7 @@ def get_jax_jacob(poses, edges, fixed):
 
 
 class LM:
-    def __init__(self, init_poses, edges, fixed, lmda, max_itrs, tol, weight_ratios):
+    def __init__(self, init_poses, edges, fixed, lmda, max_itrs, tol, weight_ratios, odo_wt=10):
         self.lmda = lmda
         self.max_itrs = max_itrs
         self.tol = tol
@@ -131,7 +131,7 @@ class LM:
         self.vars_cnt = poses_cnt * X_SIZE
 
         # info mat
-        odo_wt = 10
+        odo_wt = odo_wt
         loop_wt = odo_wt * weight_ratios[0]
         fixed_wt = odo_wt * weight_ratios[1]
         print(f"Using Weights: ({odo_wt}, {loop_wt}, {fixed_wt})\n")
