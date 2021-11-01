@@ -83,7 +83,7 @@ def get_jax_jacob(poses, edges, fixed):
 
 
 class LM:
-    def __init__(self, init_poses, edges, fixed, lmda, max_itrs, tol):
+    def __init__(self, init_poses, edges, fixed, lmda, max_itrs, tol, weight_ratios):
         self.lmda = lmda
         self.max_itrs = max_itrs
         self.tol = tol
@@ -96,14 +96,20 @@ class LM:
         self.contraints_cnt = (edge_cnt+1) * X_SIZE
         self.vars_cnt = poses_cnt * X_SIZE
 
-        info_vals = [2000]*X_SIZE                        # for fixed
+        # info mat
+        odo_wt = 5
+        loop_wt = odo_wt * weight_ratios[0]
+        fixed_wt = odo_wt * weight_ratios[1]
+        print(f"Using Weights: ({odo_wt}, {loop_wt}, {fixed_wt})\n")
+
+        info_vals = [fixed_wt]*X_SIZE                       # for fixed
         for edge in edges:
-            i1 = int(edge[0])
-            i2 = int(edge[1])
+            i1, i2 = edge[0:2].astype(int)
+
             if i2 - i1 == 1:
-                info_vals += [100]*X_SIZE               # odo
+                info_vals += [odo_wt]*X_SIZE                # odo
             else:
-                info_vals += [1000]*X_SIZE               # loop closure
+                info_vals += [loop_wt]*X_SIZE               # loop closure
 
         info_mat = np.diag(info_vals)
         self.omega = jnp.array(info_mat)
@@ -127,32 +133,34 @@ class LM:
         error_arr = [error]
         itr = 0
 
-        while error > tol and itr < max_itrs:
+        while itr < max_itrs:
             print(f"Iteration {itr}: Error: {error}")
-            if itr % 10 == 0:
+            if itr % 5 == 0:
                 draw_three(poses_arr)
             poses = self.update_poses(poses)
             error = self.get_error(poses)
 
-            # if error > error_arr[-1]:
-            #     self.lmda *= 2
-            # else:
-            #     self.lmda /= 3
+            if error > error_arr[-1]:
+                self.lmda *= 2
+            else:
+                self.lmda /= 3
 
             poses_arr.append(poses)
             error_arr.append(error)
             itr += 1
+            if jnp.linalg.norm(poses_arr[-1] - poses_arr[-2]) < tol:
+                break
 
-        print("Final Error: ", error)
+        print(f"Final Error: {error} at itr: {itr}")
         draw_three(poses_arr)
         return poses_arr, error_arr
 
     def update_poses(self, poses):
         f = self.get_residual(poses)
         j = self.get_jacobian(poses)
-        I = jnp.eye(j.shape[1])
+        H = j.T @ self.omega @ j
 
-        delta = -jnp.linalg.pinv(j.T @ self.omega @ j + self.lmda * I) @ (
+        delta = -jnp.linalg.pinv(H + self.lmda * (j.T @ j)) @ (
             j.T @ self.omega.T @ f)
 
         new_poses = poses + delta.reshape(poses.shape)
