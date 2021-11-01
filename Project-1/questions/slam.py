@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+from matplotlib import pyplot as plt
 import numpy as np
 from helpers import draw_three
 
@@ -95,14 +96,14 @@ class LM:
         self.contraints_cnt = (edge_cnt+1) * X_SIZE
         self.vars_cnt = poses_cnt * X_SIZE
 
-        info_vals = [100]*X_SIZE                        # for fixed
+        info_vals = [2000]*X_SIZE                        # for fixed
         for edge in edges:
             i1 = int(edge[0])
             i2 = int(edge[1])
             if i2 - i1 == 1:
-                info_vals += [1000]*X_SIZE               # odo
+                info_vals += [100]*X_SIZE               # odo
             else:
-                info_vals += [2000]*X_SIZE               # loop closure
+                info_vals += [1000]*X_SIZE               # loop closure
 
         info_mat = np.diag(info_vals)
         self.omega = jnp.array(info_mat)
@@ -133,16 +134,17 @@ class LM:
             poses = self.update_poses(poses)
             error = self.get_error(poses)
 
-            if error > error_arr[-1]:
-                self.lmda *= 2
-            else:
-                self.lmda /= 3
+            # if error > error_arr[-1]:
+            #     self.lmda *= 2
+            # else:
+            #     self.lmda /= 3
 
             poses_arr.append(poses)
             error_arr.append(error)
             itr += 1
 
         print("Final Error: ", error)
+        draw_three(poses_arr)
         return poses_arr, error_arr
 
     def update_poses(self, poses):
@@ -150,7 +152,7 @@ class LM:
         j = self.get_jacobian(poses)
         I = jnp.eye(j.shape[1])
 
-        delta = -jnp.linalg.pinv(j.T @ j + self.lmda * I) @ (
+        delta = -jnp.linalg.pinv(j.T @ self.omega @ j + self.lmda * I) @ (
             j.T @ self.omega.T @ f)
 
         new_poses = poses + delta.reshape(poses.shape)
